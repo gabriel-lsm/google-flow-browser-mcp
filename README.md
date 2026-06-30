@@ -3,31 +3,101 @@
 
 # 🧠 Google Flow Browser MCP
 
-**Control [Google Flow](https://labs.google/fx/tools/flow) — image & video generation — directly from your AI agent via MCP.**
+**Controle o [Google Flow](https://labs.google/fx/tools/flow) — geração de imagens e vídeos — diretamente pelo Claude Code via MCP.**
 
 <p>
   <img src="https://img.shields.io/badge/version-1.0.0-blue?style=flat-square" alt="Version 1.0.0">
   <img src="https://img.shields.io/badge/node-%3E%3D18-green?style=flat-square" alt="Node >= 18">
   <img src="https://img.shields.io/badge/license-MIT-lightgrey?style=flat-square" alt="License MIT">
   <img src="https://img.shields.io/badge/MCP-server-8A2BE2?style=flat-square" alt="MCP Server">
-  <img src="https://img.shields.io/badge/OpenCode-ready-4CAF50?style=flat-square" alt="OpenCode Ready">
+  <img src="https://img.shields.io/badge/Windows-ready-0078D4?style=flat-square" alt="Windows Ready">
 </p>
-
-<br>
-
-[✨ Features](#-features) •
-[🚀 Quick Start](#-quick-start) •
-[🔧 Tools](#-tools) •
-[⚙️ Configuration](#️-configuration) •
-[🛡️ Safety](#️-safety--ethics)
-
-<br>
 
 </div>
 
 ---
 
-> **🇫🇷 Ce serveur MCP permet à votre agent AI (OpenCode) d'utiliser Google Flow pour générer des images et des vidéos, via votre propre compte Google et sans partager vos identifiants.**
+## ⚡ Quick Start (Windows — 3 passos)
+
+### Pré-requisitos
+- [Node.js 18+](https://nodejs.org)
+- Google Chrome instalado
+- Conta Google com acesso ao [Google Flow](https://labs.google/fx/tools/flow)
+
+### Passo 1 — Clonar e configurar
+
+```powershell
+git clone https://github.com/gabriel-lsm/google-flow-browser-mcp.git
+cd google-flow-browser-mcp
+.\scripts\setup.ps1
+```
+
+O script `setup.ps1` faz automaticamente:
+- ✓ Instala as dependências npm
+- ✓ Localiza o Chrome no sistema
+- ✓ Cria o `config/flow.config.json` com seus caminhos
+- ✓ Atualiza o `settings.json` do Claude Code
+
+### Passo 2 — Iniciar o Chrome
+
+```powershell
+.\scripts\start-browser.ps1
+```
+
+> Se o Chrome já estiver aberto com CDP na porta 9222, o script detecta e não faz nada.
+
+### Passo 3 — Reiniciar o Claude Code
+
+Reinicie o Claude Code para carregar o novo MCP. Depois chame:
+
+```
+flow_connect
+```
+
+---
+
+## 🔧 Configuração manual (se o setup.ps1 não funcionar)
+
+Edite `config/flow.config.json`:
+
+```json
+{
+  "expectedAccount": "seu-email@gmail.com",
+  "chromePath": "C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe",
+  "chromeUserDataDir": "C:\\Users\\SEU_USUARIO\\AppData\\Local\\Google\\Chrome\\User Data Flow",
+  "chromeProfile": "Default",
+  "cdpPort": 9222,
+  "headless": false
+}
+```
+
+Adicione ao `settings.json` do Claude Code:
+
+```json
+{
+  "mcpServers": {
+    "google-flow-browser": {
+      "command": "node",
+      "args": ["C:\\caminho\\para\\google-flow-browser-mcp\\src\\index.js"]
+    }
+  }
+}
+```
+
+---
+
+## 📋 Fluxo de uso no Claude Code
+
+```
+1. flow_connect          → conecta ao Chrome (ou abre se necessário)
+2. flow_is_logged        → verifica se a sessão está ativa
+3. flow_restore_session  → restaura cookies salvos (evita re-login)
+4. flow_generate_image   → gera imagem com prompt
+5. flow_wait_generation  → aguarda autonomamente até terminar (sem polling)
+6. flow_download_latest  → baixa o arquivo gerado
+7. flow_save_session     → salva sessão para próxima vez
+```
+
 
 ---
 
