@@ -1,4 +1,4 @@
-# start-browser.ps1 — Inicia o Chrome com CDP para o Google Flow MCP
+﻿# start-browser.ps1 — Inicia o Chrome com CDP para o Google Flow MCP
 # Uso: .\scripts\start-browser.ps1
 # Se o Chrome já estiver rodando com CDP na porta 9222, não faz nada.
 
@@ -57,7 +57,7 @@ Write-Host "Iniciando Chrome com CDP na porta $CdpPort..." -ForegroundColor Yell
 Write-Host "  Perfil : $Profile" -ForegroundColor Gray
 Write-Host "  DataDir: $UserDataDir" -ForegroundColor Gray
 
-$args = @(
+$chromeArgs = @(
     "--user-data-dir=`"$UserDataDir`""
     "--profile-directory=`"$Profile`""
     "--remote-debugging-port=$CdpPort"
@@ -67,7 +67,7 @@ $args = @(
     "--disable-blink-features=AutomationControlled"
 )
 
-Start-Process -FilePath $ChromePath -ArgumentList $args
+Start-Process -FilePath $ChromePath -ArgumentList $chromeArgs
 
 # ── Aguardar CDP ficar disponível (até 15s) ───────────────────────────────────
 Write-Host "Aguardando Chrome inicializar..." -ForegroundColor Yellow
