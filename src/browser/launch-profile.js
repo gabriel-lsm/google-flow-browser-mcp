@@ -32,23 +32,11 @@ export async function launchKiaraProfile(headless = false) {
     return { success: true, message: 'Already connected' };
   }
 
-  // Windows: AppData\Local\Google\Chrome\User Data\Profile 3
-  // Linux:   .config/google-chrome/Profile 3
-  const profileSource = process.platform === 'win32'
-    ? path.resolve(HOME_DIR, 'AppData', 'Local', 'Google', 'Chrome', 'User Data', 'Profile 3')
-    : path.resolve(HOME_DIR, '.config/google-chrome/Profile 3');
-
-  if (!fs.existsSync(profileSource)) {
-    throw new FlowError(ErrorCodes.CONFIG_ERROR,
-      `Profile 3 not found at ${profileSource}. Make sure Chrome Profile 3 exists and is configured with your Google account.`);
-  }
-
-  logger.info('Launching Chrome via direct+CDP method (anti-detection)', { profileSource });
-
+  // PRIORITY 1: Connect to already-running Chrome via CDP (start-browser.ps1 case)
+  // This works regardless of which profile Chrome was launched with.
   try {
-    // Try connecting to existing Chrome instance first
     const existing = await chromium.connectOverCDP(`http://127.0.0.1:${CDP_PORT}`);
-    logger.info('Found existing Chrome instance, reusing');
+    logger.info('Found existing Chrome instance via CDP, reusing (no profile check needed)');
     const ctx = existing.contexts()[0];
     const pg = ctx?.pages()[0];
     setBrowser(existing);
@@ -59,14 +47,45 @@ export async function launchKiaraProfile(headless = false) {
     setPage(newPage);
     return { browser: existing, context: ctx, page: newPage };
   } catch {
-    // Launch Chrome directly (not via Playwright) for anti-detection
-    return await launchChromeDirect({
-      chromePath: resolveChromePath(),
-      cdpPort: CDP_PORT,
-      headless,
-      profileSource,
-    });
+    logger.info('No existing Chrome on CDP port, will launch new instance');
   }
+
+  // PRIORITY 2: Launch Chrome directly with the configured profile
+  // Windows: AppData\Local\Google\Chrome\User Data\Profile 1 (or Profile 3)
+  // Linux:   .config/google-chrome/Profile 1
+  const chromeUserDataDir = get('chromeUserDataDir', null);
+  const chromeProfile = get('chromeProfile', 'Default');
+
+  // Try the configured profile first, then fall back to Default / Profile 1
+  const profileCandidates = process.platform === 'win32'
+    ? [
+        chromeUserDataDir
+          ? path.join(chromeUserDataDir, chromeProfile)
+          : path.resolve(HOME_DIR, 'AppData', 'Local', 'Google', 'Chrome', 'User Data', chromeProfile),
+        path.resolve(HOME_DIR, 'AppData', 'Local', 'Google', 'Chrome', 'User Data', 'Default'),
+        path.resolve(HOME_DIR, 'AppData', 'Local', 'Google', 'Chrome', 'User Data', 'Profile 1'),
+      ]
+    : [
+        path.resolve(HOME_DIR, '.config/google-chrome', chromeProfile),
+        path.resolve(HOME_DIR, '.config/google-chrome/Default'),
+        path.resolve(HOME_DIR, '.config/google-chrome/Profile 1'),
+      ];
+
+  const profileSource = profileCandidates.find(p => fs.existsSync(p));
+
+  if (!profileSource) {
+    throw new FlowError(ErrorCodes.CONFIG_ERROR,
+      `No Chrome profile found. Tried: ${profileCandidates.join(', ')}. ` +
+      'Run start-browser.ps1 first to launch Chrome with CDP, then call flow_connect again.');
+  }
+
+  logger.info('Launching Chrome via direct+CDP method', { profileSource });
+  return await launchChromeDirect({
+    chromePath: resolveChromePath(),
+    cdpPort: CDP_PORT,
+    headless,
+    profileSource,
+  });
 }
 
 export async function navigateToFlow(page, toolPage) {

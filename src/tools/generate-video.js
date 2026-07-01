@@ -202,7 +202,7 @@ export async function handleGenerateVideo(args) {
     });
 
     jobQueue.completeJob(job.id, {
-      status: 'ready_for_confirmation',
+      status: 'generating',
       type: 'video',
       account: get('expectedAccount'),
       model_used: model,
@@ -210,7 +210,7 @@ export async function handleGenerateVideo(args) {
       duration,
       quantity: qty,
       prompt: args.prompt,
-      message: 'Video generation setup complete. Manual confirmation required (uses credits).',
+      message: 'Video generation started. Call flow_wait_generation to wait for completion, then flow_download_latest to get the file.',
       screenshot: await takeScreenshot(page, 'video-ready'),
     });
 
