@@ -222,7 +222,10 @@ export function getContext() {
 }
 
 export function isBrowserConnected() {
-  return isConnected;
+  if (!isConnected || !browser || !page) return false;
+  if (!browser.isConnected()) return false;
+  if (page.isClosed()) return false;
+  return true;
 }
 
 export function setPage(newPage) {
