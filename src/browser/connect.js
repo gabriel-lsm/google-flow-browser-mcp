@@ -120,9 +120,12 @@ export async function launchChromeDirect(options = {}) {
   const chromePath = options.chromePath || resolveChromePath();
   const cdpPort = options.cdpPort || get('cdpPort', 9222);
   const headless = options.headless ?? get('headless', false);
-  const profileSource = options.profileSource || path.resolve(HOME_DIR, '.config/google-chrome/Profile 3');
+  
+  // Use the exact User Data Dir from config
+  const chromeUserDataDir = get('chromeUserDataDir');
+  const chromeProfile = get('chromeProfile', 'Default');
 
-  if (isConnected && page) {
+  if (isConnected && page && !page.isClosed()) {
     logger.info('Already connected, reusing browser');
     return { browser, context, page };
   }
@@ -130,21 +133,6 @@ export async function launchChromeDirect(options = {}) {
   if (!fs.existsSync(chromePath)) {
     throw new FlowError(ErrorCodes.PLAYWRIGHT_ERROR, `Chrome not found at ${chromePath}`);
   }
-
-  const tempDir = path.join(os.tmpdir(), `chrome-kiara-cdp-${Date.now()}`);
-  fs.mkdirSync(tempDir, { recursive: true });
-
-  const localStateSrc = path.resolve(path.dirname(profileSource), '../Local State');
-  if (fs.existsSync(profileSource)) {
-    fs.cpSync(profileSource, path.join(tempDir, 'Profile 3'), { recursive: true });
-  }
-  if (fs.existsSync(localStateSrc)) {
-    fs.cpSync(localStateSrc, path.join(tempDir, 'Local State'));
-  } else {
-    fs.writeFileSync(path.join(tempDir, 'Local State'), JSON.stringify({ profile: { info_cache: {} } }));
-  }
-
-  logger.info('Temp profile created with cookies', { tempDir });
 
   try {
     const existing = await chromium.connectOverCDP(`http://127.0.0.1:${cdpPort}`);
@@ -154,15 +142,20 @@ export async function launchChromeDirect(options = {}) {
 
   const args = [
     `--remote-debugging-port=${cdpPort}`,
-    `--user-data-dir=${tempDir}`,
-    '--profile-directory=Profile 3',
-    '--no-first-run', '--no-default-browser-check',
+    `--no-first-run`, '--no-default-browser-check',
     '--disable-blink-features=AutomationControlled',
     '--window-size=1920,1080',
   ];
+  
+  if (chromeUserDataDir) {
+    args.push(`--user-data-dir=${chromeUserDataDir}`);
+  }
+  if (chromeProfile) {
+    args.push(`--profile-directory=${chromeProfile}`);
+  }
   if (headless) args.push('--headless=new');
 
-  logger.info('Launching Chrome directly', { chromePath, cdpPort, headless });
+  logger.info('Launching Chrome directly on real profile', { chromePath, cdpPort, headless, chromeUserDataDir, chromeProfile });
 
   const chromeProcess = spawn(chromePath, args, { stdio: ['ignore', 'pipe', 'pipe'] });
 
@@ -184,7 +177,7 @@ export async function launchChromeDirect(options = {}) {
   context = browser.contexts()[0];
   page = context.pages()[0] || await context.newPage();
   isConnected = true;
-  global.__chromeTempDir = tempDir;
+  global.__chromeProcess = chromeProcess; // save process reference if needed
 
   logger.info('Chrome direct + CDP connected', { webdriver: await page.evaluate(() => navigator.webdriver) });
   return { browser, context, page };
