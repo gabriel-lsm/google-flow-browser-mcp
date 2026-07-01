@@ -95,22 +95,11 @@ export async function handleGenerateImage(args) {
     }
 
     // STEP 4: Verify the model selector confirms IMAGE mode (NOT video)
-    // Flow's bottom toolbar is always present in a project with a model selector.
-    // No "Image/Video" mode tabs exist — the generation mode is determined by
-    // which model is selected (e.g. "Nano Banana 2" = image, "Omni Flash" = video).
-    const modelFromUI = await page.evaluate(() => {
-      const modelBtn = Array.from(document.querySelectorAll('button'))
-        .find(b => {
-          const text = b.textContent || '';
-          return (text.includes('Nano') || text.includes('Banana') ||
-                  text.includes('Omni') || text.includes('Veo') ||
-                  text.includes('Imagen')) && b.offsetParent !== null;
-        });
-      return modelBtn ? modelBtn.textContent.trim().replace(/\s+/g, ' ').substring(0, 80) : null;
-    }).catch(() => null);
+    // Re-use the activeModel already detected by detectState() — avoids a second evaluate().
+    const modelFromUI = preState.activeModel || null;
 
     if (modelFromUI) {
-      logger.info('Model selector shows:', { modelFromUI });
+      logger.info('Model selector shows (from state-detector):', { modelFromUI });
       const videoModelNames = ['Omni Flash', 'Veo', 'Omni'];
       const isVideoModel = videoModelNames.some(v => modelFromUI.includes(v));
       if (isVideoModel) {

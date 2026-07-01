@@ -1,12 +1,28 @@
 import { chromium } from 'playwright';
 import path from 'path';
 import fs from 'fs';
+import os from 'os';
 import { logger } from '../utils/logger.js';
 import { get } from '../utils/config.js';
 import { FlowError, ErrorCodes } from '../utils/errors.js';
 import { launchChromeDirect, setPage, setContext, setConnected, setBrowser, isBrowserConnected } from './connect.js';
 
-const CHROME_PATH = '/opt/google/chrome/chrome';
+/** Cross-platform home directory (mirrors connect.js) */
+const HOME_DIR = process.env.USERPROFILE || process.env.HOME || os.homedir();
+
+/** Resolve Chrome executable path — cross-platform */
+function resolveChromePath() {
+  const fromConfig = get('chromePath', null);
+  if (fromConfig) return fromConfig;
+  if (process.platform === 'win32') {
+    return 'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe';
+  }
+  if (process.platform === 'darwin') {
+    return '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome';
+  }
+  return '/opt/google/chrome/chrome'; // Linux
+}
+
 const CDP_PORT = get('cdpPort', 9222);
 const FLOW_URL = get('flowUrl', 'https://labs.google/fx/fr/tools/flow');
 
@@ -16,7 +32,11 @@ export async function launchKiaraProfile(headless = false) {
     return { success: true, message: 'Already connected' };
   }
 
-  const profileSource = path.resolve(process.env.HOME, '.config/google-chrome/Profile 3');
+  // Windows: AppData\Local\Google\Chrome\User Data\Profile 3
+  // Linux:   .config/google-chrome/Profile 3
+  const profileSource = process.platform === 'win32'
+    ? path.resolve(HOME_DIR, 'AppData', 'Local', 'Google', 'Chrome', 'User Data', 'Profile 3')
+    : path.resolve(HOME_DIR, '.config/google-chrome/Profile 3');
 
   if (!fs.existsSync(profileSource)) {
     throw new FlowError(ErrorCodes.CONFIG_ERROR,
@@ -41,7 +61,7 @@ export async function launchKiaraProfile(headless = false) {
   } catch {
     // Launch Chrome directly (not via Playwright) for anti-detection
     return await launchChromeDirect({
-      chromePath: CHROME_PATH,
+      chromePath: resolveChromePath(),
       cdpPort: CDP_PORT,
       headless,
       profileSource,
